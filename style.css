@@ -1,0 +1,32 @@
+
+body{
+    background-color: rgb(240, 219, 36);
+    width: 80%;
+    height: 200px;
+    margin: auto;
+    padding: 10px
+}
+canvas{
+    /* background-color: rgb(255, 255, 255); */
+    width: 500px;
+    height: 500px;
+}
+
+.left{
+    width: 15%;
+    height: 200px;
+    float: left;
+}
+.right{
+    width: 15%;
+    height: 200px;
+    float: right;
+}
+.center{
+    text-align: center;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 75%;
+    align-items: center;
+}

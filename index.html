@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title> Assignment 0 </title>
+        <link rel="stylesheet" href="style.css">
+        <!-- <script src="script.js"></script> -->
+    </head>
+
+    <h1> CS 425 Assignment 0 </h1>
+    <br>
+    <p> by Ese Omene </p>
+    <br>
+    <body class="center">
+        <div class="left">
+            <p>Sliders</p>
+            <input id="R" type="range" min="0" max="255">
+            <input id="G" type="range" min="0" max="255">
+            <input id="B" type="range" min="0" max="255">
+            <input id="A" type="range" min="0" max="255">
+            <input id="N" type="range" min="0" max="100">
+        </div>
+        <div class="right">
+            <p>Input File</p>
+            <input type="file" accept=".json">
+        </div>
+        <div>
+            <p>Canvas</p>
+            <canvas id="gl_canvas"></canvas>
+        </div>
+    </body>
+
+    <script>
+        var red_slider = document.getElementById("R");
+        var green_slider = document.getElementById("G");
+        var blue_slider = document.getElementById("B");
+
+        var canvas = document.getElementById("gl_canvas");
+        var context = canvas.getContext("2d");
+        
+        context.fillStyle = (red_slider.value, green_slider.value, blue_slider.value);
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        function changeColorOnInput(){
+            context.fillStyle = "rgb(" + red_slider.value + ", " + green_slider.value + ", "  + blue_slider.value + ")";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        red_slider.oninput = changeColorOnInput();
+        green_slider.oninput = changeColorOnInput();
+        blue_slider.oninput = changeColorOnInput();
+    </script>
+    
+</html>
