@@ -4,7 +4,6 @@
         <meta charset="UTF-8">
         <title> Assignment 0 </title>
         <link rel="stylesheet" href="style.css">
-        <!-- <script src="script.js"></script> -->
     </head>
 
     <h1> CS 425 Assignment 0 </h1>
@@ -14,15 +13,19 @@
     <body class="center">
         <div class="left">
             <p>Sliders</p>
-            <input id="R" type="range" min="0" max="255">
-            <input id="G" type="range" min="0" max="255">
-            <input id="B" type="range" min="0" max="255">
-            <input id="A" type="range" min="0" max="255">
-            <input id="N" type="range" min="0" max="100">
+            <input id="R" type="range" min="0" max="255" value="0">
+            <input id="G" type="range" min="0" max="255" value="0">
+            <input id="B" type="range" min="0" max="255" value="0">
+            <input id="A" type="range" min="0" max="255" value="255">
+            <input id="N" type="range" min="1" value="1">
         </div>
         <div class="right">
             <p>Input File</p>
-            <input type="file" accept=".json">
+            <input id="input_file" type="file" accept=".json">
+            <div>
+                <input type="checkbox" id="check_box" name="check_box" value="toggle color of triangles" onclick="randomizeColor()">
+                <label for="check_box">Toggle Color of Triangles</label>
+            </div>
         </div>
         <div>
             <p>Canvas</p>
@@ -31,24 +34,273 @@
     </body>
 
     <script>
-        var red_slider = document.getElementById("R");
-        var green_slider = document.getElementById("G");
-        var blue_slider = document.getElementById("B");
+        var red_slider;
+        var green_slider;
+        var blue_slider;
+        var alpha_slider;
+        var n_slider;
+        var input_file;
+        var check_box;
+        var gl;
+        var vectexShaderSrc = 
+            `#version 300 es
 
-        var canvas = document.getElementById("gl_canvas");
-        var context = canvas.getContext("2d");
-        
-        context.fillStyle = (red_slider.value, green_slider.value, blue_slider.value);
-        context.fillRect(0, 0, canvas.width, canvas.height);
+            in vec2 position;
+            in vec4 color;
 
-        function changeColorOnInput(){
-            context.fillStyle = "rgb(" + red_slider.value + ", " + green_slider.value + ", "  + blue_slider.value + ")";
-            context.fillRect(0, 0, canvas.width, canvas.height);
+            out vec4 vColor;
+
+            void main() {
+            vColor = color;
+            gl_Position = vec4(position.xy, 0, 1);
+            }
+        `;
+        var fragmentShaderSrc = 
+            `#version 300 es
+            precision highp float;
+
+            in vec4 vColor;
+            out vec4 outColor;
+            uniform vec4 uColor;
+
+            void main() {
+                outColor = vec4(vColor.rgb,vColor.a);
+                // outColor = vec4(vColor.rgb,uColor.a);
+                // outColor = uColor;
+            }
+        `;
+        var program;
+        var vertexShader;
+        var fragmentShader;
+        var posBuffer;
+        var colorBuffer;
+        var vao;
+        var running = false;
+        var vertices2D = [
+            0.0, 1.0, 0.0,
+            -1.0, -1.0, 0.0,
+            1.0, -1.0, 0.0,
+        ];
+        var color = [
+            1,0,0,1,
+            0,1,0,1,
+            0,0,1,1
+        ];
+        var file;
+        var obj;
+        var triangles;
+        var numTriangles = 1;
+        var update = false;
+
+        document.querySelector("#input_file").addEventListener('change', (event) => {
+            let reader = new FileReader();
+            const fileList = event.target.files;
+            file = new Blob(fileList, {type: 'application/json'});
+
+            reader.addEventListener('load', function(e) {
+                obj = JSON.parse(e.target.result);
+                n_slider.max = obj.positions.length/9;
+                console.log(n_slider.max);
+                makeTriangles(n_slider.max);
+            });
+            reader.readAsText(file);
+        });
+
+        function makeTriangles(number){
+            triangles = obj;
+            n_slider.max = number;
+            n_slider.value = number;
+            numTriangles = number;
+            posBuffer = createBuffer(triangles.positions);
+            colorBuffer = createBuffer(triangles.colors);
+            var posAttribLoc = gl.getAttribLocation(program, "position");
+            var colorAttribLoc = gl.getAttribLocation(program, "color");
+            createVAO(posAttribLoc, colorAttribLoc);
         }
 
-        red_slider.oninput = changeColorOnInput();
-        green_slider.oninput = changeColorOnInput();
-        blue_slider.oninput = changeColorOnInput();
+        function loadShader(type, source){
+            var shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
+                var info = gl.getShaderInfoLog(shader);
+                console.log('Could not compile WebGL program: ' + info);
+            }
+            
+            return shader;
+        }
+
+        function createProgram(){
+            program = gl.createProgram();
+
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+
+            gl.linkProgram(program);
+            
+            if(!gl.getProgramParameter(program, gl.LINK_STATUS)){
+                var info = gl.getProgramInfoLog(program);
+                console.log('Could not compile WebGL program: ' + info);
+            }
+        }
+
+        function changeColorOnInput(){
+            var r = red_slider.value/255.0;
+            var g = green_slider.value/255.0;
+            var b = blue_slider.value/255.0;
+            var a = alpha_slider.value/255.0;
+
+            color = [
+                r, g, b, a,
+                r, g, b, a,
+                r, g, b, a,
+            ]
+            currColor = [
+                r, g, b,
+                r, g, b,
+                r, g, b,
+            ];
+            var newPositions = [];
+            var newColors = [];
+
+            if(triangles != undefined){
+                if(update){
+                    for(let i = 0; i < numTriangles * 9; i++){
+                        var j = i%9;
+                        newPositions[i] = triangles.positions[i];
+                    }
+                    for(let i = 0; i < numTriangles*12; i++){
+                        var j = i%12;
+                        newColors[i] = color[j];
+                    }
+                }
+                else{
+                    for(let i = 0; i < numTriangles * 9; i++){
+                        var j = i%9;
+                        newPositions[i] = triangles.positions[i];
+                    }
+                    for(let i = 0; i < numTriangles*12; i++){
+                        var j = i%12;
+                        newColors[i] = triangles.colors[j];
+                    }
+                }
+                posBuffer = createBuffer(newPositions);
+                colorBuffer = createBuffer(newColors);
+                var posAttribLoc = gl.getAttribLocation(program, "position");
+                var colorAttribLoc = gl.getAttribLocation(program, "color");
+                createVAO(posAttribLoc, colorAttribLoc);
+            }
+
+        }
+
+        function randomizeColor(){
+
+            if(check_box.checked){
+                red_slider.value = Math.random() * 255;
+                green_slider.value = Math.random() * 255;
+                blue_slider.value = Math.random() * 255;
+
+                update = true;
+                changeColorOnInput();
+            }
+        }
+
+        function createBuffer(verticies){
+            var buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verticies), gl.STATIC_DRAW);
+
+            return buffer;
+        }
+
+        function createVAO(posAttribLoc, colorAttribLoc){
+            vao = gl.createVertexArray();
+
+            gl.bindVertexArray(vao);
+            gl.enableVertexAttribArray(posAttribLoc);
+            var size = 3;
+            var type = gl.FLOAT;
+            gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+            gl.vertexAttribPointer(posAttribLoc, size, type, false, 0, 0);
+
+            gl.enableVertexAttribArray(colorAttribLoc);
+            var size = 4;
+            var type = gl.FLOAT;
+            gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+            gl.vertexAttribPointer(colorAttribLoc, size, type, false, 0, 0)
+        }
+
+        function draw(){
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            changeColorOnInput();
+
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+            gl.useProgram(program);
+            gl.bindVertexArray(vao);
+            var primitiveType = gl.TRIANGLES;
+            var count = 3 * numTriangles;
+            gl.drawArrays(primitiveType, 0, count);
+
+            requestAnimationFrame(draw);
+        }
+
+        function main(){
+            red_slider = document.querySelector("#R");
+            green_slider = document.querySelector("#G");
+            blue_slider = document.querySelector("#B");
+            alpha_slider = document.querySelector("#A");
+            n_slider = document.querySelector("#N");
+            input_file = document.querySelector("#input_file");
+            check_box = document.querySelector("#check_box");
+            
+            var canvas = document.querySelector("#gl_canvas");
+            gl = canvas.getContext("webgl2");
+
+            vertexShader = loadShader(gl.VERTEX_SHADER, vectexShaderSrc);
+            fragmentShader = loadShader(gl.FRAGMENT_SHADER, fragmentShaderSrc);
+            createProgram();
+            
+            var posAttribLoc = gl.getAttribLocation(program, "position");
+            var colorAttribLoc = gl.getAttribLocation(program, "color");
+
+            posBuffer = createBuffer(vertices2D);
+            colorBuffer = createBuffer(color);
+            createVAO(posAttribLoc, colorAttribLoc);
+
+            window.requestAnimationFrame(draw);
+        }
+
+        window.onload = main();
+        red_slider.oninput = function(){
+            update = true;
+        }
+        green_slider.oninput = function(){
+            update = true;
+        }
+        blue_slider.oninput = function(){
+            update = true;
+        }
+        alpha_slider.oninput = function(){
+            update = true;
+        }
+        n_slider.oninput = function(){
+            numTriangles = n_slider.value
+            var pos = [];
+            var col = [];
+            if(triangles != undefined){
+                for(let i = 0; i < 9*numTriangles; i++){
+                    pos[i] = triangles.positions[i];
+                }
+                for(let i = 0; i < 12 * numTriangles; i++){
+                    col[i] = triangles.colors[i];
+                }
+                changeColorOnInput();
+            }
+        }
     </script>
     
 </html>
