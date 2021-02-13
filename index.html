@@ -191,6 +191,13 @@
                 var colorAttribLoc = gl.getAttribLocation(program, "color");
                 createVAO(posAttribLoc, colorAttribLoc);
             }
+            else{
+                posBuffer = createBuffer(vertices2D);
+                colorBuffer = createBuffer(color);
+                var posAttribLoc = gl.getAttribLocation(program, "position");
+                var colorAttribLoc = gl.getAttribLocation(program, "color");
+                createVAO(posAttribLoc, colorAttribLoc);
+            }
 
         }
 
